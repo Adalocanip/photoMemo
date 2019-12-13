@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
-import { NavController, ModalController } from '@ionic/angular';
+import { NavController, ModalController, AlertController } from '@ionic/angular';
 import { AuthenticationService } from '../services/authentication.service';
-import {Camera, CameraOptions } from '@ionic-native/camera/ngx';
+import { Camera, CameraOptions } from '@ionic-native/camera/ngx';
 import { File } from '@ionic-native/file/ngx';
 
 import * as firebase from "firebase";
@@ -15,13 +15,17 @@ export class DashboardPage implements OnInit {
  
   result;
   userEmail: string;
- 
+  captureDataUrl: string;
+  photos: Photo[] = []
+  uploadB: boolean = false;
+  
   constructor(
     private navCtrl: NavController,
     private authService: AuthenticationService,
-    private camera: Camera,
-    private file: File
-  ) {}
+    private Camera: Camera,
+    private file: File,
+    public alertCtrl: AlertController
+  ) {this.alertCtrl = alertCtrl;}
  
   ngOnInit(){
     if(this.authService.userDetails()){
@@ -44,91 +48,56 @@ export class DashboardPage implements OnInit {
     })
   }
 
-  async pickImage() {
-    try {
-      const options: CameraOptions = {
-        quality: 80,
-        destinationType: this.camera.DestinationType.FILE_URI,
-        encodingType: this.camera.EncodingType.JPEG,
-        mediaType: this.camera.MediaType.ALLMEDIA,
-        sourceType : this.camera.PictureSourceType.PHOTOLIBRARY
-      };
+  async capture() {
+    const cameraOptions: CameraOptions = {
+      quality: 50,
+      destinationType: this.Camera.DestinationType.DATA_URL,
+      encodingType: this.Camera.EncodingType.JPEG,
+      mediaType: this.Camera.MediaType.PICTURE,
+    };
+    this.Camera.getPicture(cameraOptions)
+      .then((imageData) => {		
+        this.captureDataUrl = 'data:image/jpeg;base64,' + imageData;
+        
+      }, (err) => {
+	  
+    });
+    this.uploadB = true
+  } // End of capture camera
+  upload() {
+    let storageRef = firebase.storage().ref();
+    // Create a timestamp as filename
+	
+    const filename = Math.floor(Date.now() / 1000);
 
-      let cameraInfo = await this.camera.getPicture(options);
-      let blobInfo = await this.makeFileIntoBlob(cameraInfo);
-      let uploadInfo: any = await this.uploadToFirebase(blobInfo);
+    // Create a reference to 'username/todays-date.jpg'
+	
+    const imageRef = storageRef.child(this.userEmail+`/${filename}.jpg`);
 
-      alert("File Upload Success " + uploadInfo.fileName);
-    } catch (e) {
-      console.log(e.message);
-      alert("File Upload Error " + e.message);
-    }
+    var uploadTask = imageRef.putString(this.captureDataUrl, firebase.storage.StringFormat.DATA_URL);
+    uploadTask.on('state_changed', function(snapshot){
+      console.log('success! upload')
+    }, function(err){
+      console.log('Error: '+err)
+    }, function(){
+      uploadTask.snapshot.ref.getDownloadURL().then(function(downloadURL) {
+        console.log(downloadURL)
+        var retURL = downloadURL
+        console.log(retURL)
+        this.photos.unshift({data : retURL})
+        console.log(this.photos[0].data)
+      });
+    })  
+    this.uploadB = false;
   }
 
-  // FILE STUFF
-  makeFileIntoBlob(_imagePath) {
-    return new Promise((resolve, reject) => {
-      let fileName = "";
-      this.file
-        .resolveLocalFilesystemUrl(_imagePath)
-        .then(fileEntry => {
-          let { name, nativeURL } = fileEntry;
 
-          // get the path..
-          let path = nativeURL.substring(0, nativeURL.lastIndexOf("/"));
-          console.log("path", path);
-          console.log("fileName", name);
-
-          fileName = name;
-
-          // we are provided the name, so now read the file into
-          // a buffer
-          return this.file.readAsArrayBuffer(path, name);
-        })
-        .then(buffer => {
-          // get the buffer and make a blob to be saved
-          let imgBlob = new Blob([buffer], {
-            type: "image/jpeg"
-          });
-          console.log(imgBlob.type, imgBlob.size);
-          resolve({
-            fileName,
-            imgBlob
-          });
-        })
-        .catch(e => reject(e));
-    });
-  } 
-
-   /**
-   *
-   * @param _imageBlobInfo
-   */
-  uploadToFirebase(_imageBlobInfo) {
-    console.log("uploadToFirebase");
-    return new Promise((resolve, reject) => {
-      let fileRef = firebase.storage().ref("images/" + _imageBlobInfo.fileName);
-
-      let uploadTask = fileRef.put(_imageBlobInfo.imgBlob);
-
-      uploadTask.on(
-        "state_changed",
-        (_snapshot: any) => {
-          console.log(
-            "snapshot progess " +
-              (_snapshot.bytesTransferred / _snapshot.totalBytes) * 100
-          );
-        },
-        _error => {
-          console.log(_error);
-          reject(_error);
-        },
-        () => {
-          // completion...
-          resolve(uploadTask.snapshot);
-        }
-      );
-    });
-  }
 }
+
+
+class Photo{
+  data : string;
+} 
+
+
  
