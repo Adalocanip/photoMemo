@@ -1,15 +1,28 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>Dashboard</ion-title>
+    <ion-title>Memo Gallery</ion-title>
   </ion-toolbar>
 </ion-header>
  
 <ion-content class='ion-padding'>
-  <ion-button (click)="pickImage()" expand="full">Pick Image</ion-button>
+  <ion-grid>
+    <ion-row>
+      <ion-col size="6" *ngFor="let photo of photos">
+        <ion-img [src]="photo.data" ></ion-img>
+      </ion-col>
+    </ion-row>
+  </ion-grid>
+<ion-fab vertical="bottom" horizontal="center" slot="fixed">
+  <ion-fab-button (click)="capture()">
+    <ion-icon name="camera"></ion-icon>
+  </ion-fab-button>
+</ion-fab>
+<!-- <button ion-button (click)="upload()" *ngIf="photos[0]">Upload to Firebase!</button> -->
+<ng-container *ngIf="uploadB">{{upload()}}</ng-container>
   <ion-grid>
     <ion-row>
       <ion-col text-center>
-        Welcome to Dashboard!
+        Welcome to PhotoMemo!
       </ion-col>
     </ion-row>
     <ion-row>
